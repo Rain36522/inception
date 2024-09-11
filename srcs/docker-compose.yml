@@ -1,0 +1,64 @@
+version: "3" #permet de spécifier la version du compose file choisis. Selon les versions la syntaxe et les caractéristiques peuvent changer.
+
+
+volumes:
+  mariadb_v:                               # Nom du volume
+    driver: local                          # 
+    name: mariadb_v
+    driver_opts:
+      device: /home/pudry/data/mariadb/    # Emplacement du dossier binded sur la machine hôte
+      type: none
+      o: bind
+  wordpress_v:
+    driver: local
+    name: wordpress_v
+    driver_opts:
+      device: /home/pudry/data/wordpress/
+      type: none
+      o: bind
+
+services:
+  mariadb:
+    container_name: mariadb                # Nom du container
+    networks:                              # Choix du network auquel appartient ce service 
+        - inception
+    build:
+        context: requirements/mariadb     # Emplacement du Dockerfile
+        dockerfile: Dockerfile             # Nom du fichier Dockerfile
+    volumes:
+        - mariadb_v:/var/lib/mysql         # Lien entre le volume en local et le volume dans le container
+    restart: unless-stopped                # Politique de redémarage
+    env_file: .env                         # Definition des variables de l'environement
+
+  nginx:
+    container_name: nginx
+    volumes:
+        - wordpress_v:/var/www/wordpress
+    networks:
+        - inception
+    depends_on:
+        - wordpress
+    build:
+        context: requirements/nginx
+        dockerfile: Dockerfile
+    ports:                                 # Exposition du port vers l'extêrieur du network
+        - "443:443"                        # pour rendre accéssible notre conteneur depuis l’exterieur. PORT_HOTE:PORT_CONTAINER
+    restart: on-failure
+
+  wordpress:
+    container_name: wordpress
+    volumes:
+        - wordpress_v:/var/www/wordpress
+    networks:
+        - inception
+    build:
+        context: requirements/wordpress
+        dockerfile: Dockerfile
+    depends_on:
+        - mariadb
+    restart: on-failure
+    env_file: .env
+
+networks:                                  # Definition des networks
+    inception:                             # Nom du network
+        driver: bridge                     # type de network
